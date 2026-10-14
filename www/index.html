@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><meta name="theme-color" content="#48b9e0"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><title>Fishy! Retro V4</title>
+<style>*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#48b9e0;touch-action:none}body{display:grid;place-items:center;font-family:monospace}canvas{display:block;width:min(100vw,calc(100dvh * 0.6));height:min(100dvh,calc(100vw / 0.6));image-rendering:pixelated;touch-action:none}</style></head>
+<body><canvas id="game" width="288" height="480" aria-label="Fishy! jeu rétro"></canvas>
+<script>
+(()=>{'use strict';
+const c=document.getElementById('game'),g=c.getContext('2d',{alpha:false});g.imageSmoothingEnabled=false;
+const W=288,H=480,floor=446,fishX=75,fishR=11;
+let state='ready',fishY=210,vy=0,score=0,best=0,frame=0,last=0,spawn=0,obstacles=[],bubbles=[],flash=0;
+let muted=false,ac=null,nextBeat=0,beat=0;
+try{best=Number(localStorage.getItem('fishy-retro-best'))||0;muted=localStorage.getItem('fishy-retro-muted')==='1'}catch(e){}
+function audio(){if(muted)return null;try{if(!ac)ac=new (window.AudioContext||window.webkitAudioContext)();if(ac.state==='suspended')ac.resume();return ac}catch(e){return null}}
+function tone(freq,duration=.09,type='square',volume=.025,when){const a=audio();if(!a)return;const t=when??a.currentTime;try{const o=a.createOscillator(),v=a.createGain();o.type=type;o.frequency.setValueAtTime(freq,t);v.gain.setValueAtTime(.0001,t);v.gain.exponentialRampToValueAtTime(volume,t+.009);v.gain.exponentialRampToValueAtTime(.0001,t+duration);o.connect(v);v.connect(a.destination);o.start(t);o.stop(t+duration+.01)}catch(e){}}
+function music(){if(state!=='play'||muted||!ac||ac.state!=='running')return;const notes=[196,0,247,0,294,0,247,0,220,0,262,0,330,0,262,0];let n=0;while(nextBeat<ac.currentTime+.08&&n++<4){if(nextBeat<ac.currentTime)nextBeat=ac.currentTime+.01;let f=notes[beat%notes.length];if(f)tone(f,.12,'triangle',.012,nextBeat);if(beat%4===0)tone(98,.07,'sine',.009,nextBeat);nextBeat+=.19;beat++}}
+function startMusic(){if(!audio())return;nextBeat=ac.currentTime+.03;beat=0}
+function sfx(kind){if(kind==='swim')tone(440,.055,'square',.016);else if(kind==='point'){tone(660,.09,'square',.035);tone(880,.11,'square',.025,ac?ac.currentTime+.09:undefined)}else if(kind==='die'){tone(170,.24,'sawtooth',.04)}else if(kind==='pause')tone(350,.08,'triangle',.02)}
+function rnd(a,b){return a+Math.random()*(b-a)}
+function reset(){state='ready';fishY=210;vy=0;score=0;frame=0;spawn=0;obstacles=[];bubbles=[];flash=0}
+function begin(){reset();state='play';vy=-3.9;startMusic();sfx('swim')}
+function pause(){if(state==='play'){state='paused';sfx('pause')}else if(state==='paused'){state='play';startMusic();sfx('pause')}}
+function tap(x,y){if(y<48&&x<54&&(state==='play'||state==='paused')){pause();return}
+if(y<48&&x>W-54){muted=!muted;try{localStorage.setItem('fishy-retro-muted',muted?'1':'0')}catch(e){};if(!muted){audio();if(state==='play')startMusic()}return}
+if(state==='paused'){pause();return}if(state==='ready'||state==='dead'){begin();return}if(state==='play'){vy=-3.9;sfx('swim')}}
+function pointer(e){e.preventDefault();const r=c.getBoundingClientRect();tap((e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height)}
+c.addEventListener('pointerdown',pointer,{passive:false});
+window.addEventListener('keydown',e=>{if(['Space','ArrowUp','KeyP','Escape','KeyM'].includes(e.code))e.preventDefault();if(e.repeat)return;if(e.code==='KeyP'||e.code==='Escape'){pause();return}if(e.code==='KeyM'){tap(W-20,20);return}if(e.code==='Space'||e.code==='ArrowUp')tap(W/2,H/2)});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&state==='play')state='paused'});
+function rect(x,y,w,h,color){g.fillStyle=color;g.fillRect(Math.round(x),Math.round(y),Math.ceil(w),Math.ceil(h))}
+function text(t,x,y,size=14,color='#fff',align='center'){g.font=`bold ${size}px monospace`;g.textAlign=align;g.fillStyle='#12344b';g.fillText(t,x+1,y+2);g.fillStyle=color;g.fillText(t,x,y)}
+function seaweed(x,tip,bottom,top){const w=34;rect(x,top,w,Math.max(0,bottom-top),'#175c50');rect(x+5,top+5,w-10,Math.max(0,bottom-top-10),'#27996d');for(let y=top+5;y<bottom-8;y+=23){rect(x-6,y+8,12,6,'#1b7a59');rect(x+28,y+14,12,6,'#1b7a59')}rect(x+11,top+2,6,Math.max(0,bottom-top-4),'#56c38c');if(tip==='down')rect(x-3,bottom-9,40,9,'#164b48');else rect(x-3,top,40,9,'#164b48')}
+function fish(){g.save();g.translate(Math.round(fishX),Math.round(fishY));g.rotate(Math.max(-.35,Math.min(.6,vy*.075)));rect(-10,-8,19,16,'#ffbb4b');rect(-8,-6,16,12,'#ffd36e');rect(-16,-6,8,5,'#ff8b4b');rect(-16,1,8,5,'#ff8b4b');rect(-2,-12,7,5,'#f19b43');rect(4,-3,4,4,'#18354c');rect(5,-2,1,1,'#fff');rect(8,4,3,2,'#e77d4a');g.restore()}
+function die(){if(state==='dead')return;state='dead';flash=8;sfx('die')}
+function update(dt){if(state==='paused')return;frame+=dt;flash=Math.max(0,flash-dt);
+if(bubbles.length<35&&Math.random()<.14*dt)bubbles.push({x:rnd(8,280),y:480,r:rnd(1,3),v:rnd(.35,.95)});
+for(const b of bubbles)b.y-=b.v*dt;bubbles=bubbles.filter(b=>b.y>-8);
+if(state!=='play')return;
+vy=Math.min(4.6,vy+.21*dt);fishY+=vy*dt;
+spawn+=dt;const interval=Math.max(76,112-score*1.1);
+if(spawn>=interval){spawn-=interval;const gap=Math.max(116,147-score*.6),center=rnd(118,333);obstacles.push({x:W+22,top:center-gap/2,bottom:center+gap/2,passed:false})}
+const speed=Math.min(2.8,1.65+score*.025);
+for(const o of obstacles){o.x-=speed*dt;if(!o.passed&&o.x+34<fishX){o.passed=true;score++;sfx('point');if(score>best){best=score;try{localStorage.setItem('fishy-retro-best',String(best))}catch(e){}}}
+if(fishX+fishR>o.x+3&&fishX-fishR<o.x+31&&(fishY-fishR<o.top||fishY+fishR>o.bottom))die()}
+obstacles=obstacles.filter(o=>o.x>-50);if(fishY-fishR<15||fishY+fishR>floor)die();music()
+}
+function panel(x,y,w,h){rect(x,y,w,h,'#103c5c');rect(x+4,y+4,w-8,h-8,'#1c5773')}
+function draw(){rect(0,0,W,H,'#48b9e0');for(let y=0;y<floor;y+=32)rect(0,y,W,1,'#7ad4ed');for(let i=0;i<8;i++){let x=(i*47+frame*.2)%340-25;rect(x,32+(i%4)*43,18,2,'#b1eafa')}
+for(const b of bubbles){g.strokeStyle='#dcfaff';g.strokeRect(Math.round(b.x),Math.round(b.y),Math.round(b.r*2),Math.round(b.r*2))}
+rect(0,floor,W,H-floor,'#b29b67');rect(0,floor,W,5,'#e3c78b');for(let i=0;i<15;i++)rect(i*21-8,floor+15+(i%3)*7,3,2,'#6e795e');
+for(const o of obstacles){seaweed(o.x,'down',o.top,0);seaweed(o.x,'up',floor,o.bottom)}
+fish();
+if(state==='play'||state==='paused'){text(String(score),W/2,54,30,'#fff6d7');panel(6,7,36,32);text('II',24,29,17,'#fff6d7')}
+panel(W-42,7,36,32);text(muted?'X':'♪',W-24,29,16,'#fff6d7');
+if(state==='ready'){panel(19,148,250,177);text('FISHY!',W/2,189,31,'#ffe08b');text('RETRO OCEAN',W/2,213,13,'#b4e6e4');text('TOUCHE POUR NAGER',W/2,251,14);text('EVITE LES ALGUES !',W/2,275,12,'#b4e6e4');text('RECORD '+best,W/2,305,13,'#ffe08b');text('ESPACE / TAP POUR JOUER',W/2,368,11)}
+if(state==='paused'){panel(28,175,232,126);text('PAUSE',W/2,215,26,'#ffe08b');text('TAP POUR REPRENDRE',W/2,251,12);text('P / ECHAP = PAUSE',W/2,274,11,'#b4e6e4')}
+if(state==='dead'){panel(30,167,228,137);text('PERDU !',W/2,204,25,'#ffe08b');text('SCORE '+score,W/2,236,15);text('RECORD '+best,W/2,258,13,'#b4e6e4');text('TAP POUR REJOUER',W/2,282,12)}
+if(flash>0){g.fillStyle=`rgba(255,255,255,${flash/40})`;g.fillRect(0,0,W,H)}}
+function loop(now){const dt=Math.min(2.2,(now-last)/16.666||1);last=now;update(dt);draw();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+})();
+</script></body></html>
