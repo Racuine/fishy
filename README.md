@@ -1,4 +1,4 @@
-# FISHY! RETRO V4 — Android Edition
+# FISHY! RETRO V4 — Android Edition (workflow corrigé)
 
 Jeu pixel art hors ligne, 1 doigt, algues, poisson, sons chiptune, pause, record local. Le code du jeu est dans `www/index.html`.
 
@@ -51,3 +51,7 @@ Pour reconstruire après changement du jeu : `npx cap sync android` puis `python
 - Le mode immersif masque les barres système, mais les gestes Android restent disponibles.
 - La génération du dossier `android/` est faite par Capacitor lors de la compilation : il n'est pas inclus dans l'archive.
 - Cette livraison n'inclut **pas** d'APK/AAB précompilé : les dépendances Android ne sont pas téléchargeables dans cet environnement. Le workflow GitHub doit encore être exécuté et validé.
+
+## Correctif GitHub Actions du 14/10/2026
+
+Le workflow précédent appelait `sdkmanager tools`, un ancien paquet SDK qui n’existe plus. Le workflow corrigé configure `packages: platform-tools` pour éviter cette erreur. Remplacer `.github/workflows/android.yml` dans GitHub, puis relancer Actions. Le build Android complet reste à confirmer sur GitHub Actions.
